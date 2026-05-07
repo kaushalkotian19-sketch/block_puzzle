@@ -1,1 +1,99 @@
+@import url('https://fonts.googleapis.com/css2?family=Fredoka+One&display=swap');
 
+body {
+    margin: 0;
+    padding: 0;
+    background-color: #354f88; /* The rich navy blue background */
+    font-family: 'Fredoka One', cursive; /* Chunky arcade font */
+    color: white;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    overflow: hidden;
+    touch-action: none; /* CRITICAL: Prevents the screen from scrolling when you drag a block */
+}
+
+#game-container {
+    width: 100%;
+    max-width: 450px; 
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px;
+    box-sizing: border-box;
+}
+
+/* --- HEADER & SCORE --- */
+#header {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    font-size: 24px;
+    margin-top: 10px;
+}
+
+#high-score {
+    color: #ffb703;
+    text-shadow: 1px 2px 2px rgba(0,0,0,0.3);
+}
+
+#score-display {
+    font-size: 65px;
+    margin: 15px 0 25px 0;
+    text-shadow: 2px 4px 4px rgba(0,0,0,0.3);
+}
+
+/* --- THE 8x8 BOARD --- */
+#board {
+    width: 95vw;
+    max-width: 400px;
+    height: 95vw;
+    max-height: 400px;
+    background-color: #1a2546; /* Deep dark background for the grid */
+    border-radius: 12px;
+    padding: 6px;
+    display: grid;
+    /* This automatically creates 8 perfect rows and columns! */
+    grid-template-columns: repeat(8, 1fr);
+    grid-template-rows: repeat(8, 1fr);
+    gap: 2px;
+    box-shadow: inset 0px 5px 10px rgba(0,0,0,0.5), 0px 5px 15px rgba(0,0,0,0.3);
+}
+
+/* The empty squares on the board */
+.cell {
+    background-color: rgba(255, 255, 255, 0.04); 
+    border-radius: 4px;
+}
+
+/* --- BOTTOM TRAY --- */
+#tray {
+    width: 100%;
+    flex-grow: 1;
+    display: flex;
+    justify-content: space-evenly;
+    align-items: center;
+    margin-top: 20px;
+}
+
+.tray-slot {
+    width: 90px;
+    height: 90px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+/* --- 3D BLOCK DESIGN --- */
+.block {
+    width: 100%;
+    height: 100%;
+    border-radius: 4px;
+    /* The magic 3D Bevel effect */
+    box-shadow: 
+        inset 4px 4px 6px rgba(255,255,255,0.4),  /* Top left highlight */
+        inset -4px -4px 6px rgba(0,0,0,0.3),      /* Bottom right shadow */
+        1px 1px 3px rgba(0,0,0,0.5);              /* Drop shadow */
+}
