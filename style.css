@@ -129,3 +129,20 @@ body {
 .color-green { background-color: #2dc653; }
 .color-yellow { background-color: #ffca3a; }
 .color-purple { background-color: #9d4edd; }
+
+/* --- DRAG & DROP STATES --- */
+.shape-grid.dragging {
+    position: fixed; /* Pops it out of the tray so it can fly over the screen */
+    z-index: 1000;   /* Keeps it on top of everything else */
+    transform: scale(1.2); /* Makes it slightly bigger when picked up */
+    transition: transform 0.1s ease; /* Smooth pop animation */
+    /* pointer-events: none is critical here so our finger can "see through" the block to the grid below later! */
+    pointer-events: none; 
+}
+
+/* This applies to the shape while it is sitting in the tray */
+.shape-grid {
+    display: grid;
+    gap: 2px;
+    touch-action: none; /* Stops the browser from scrolling when we touch the piece */
+}
