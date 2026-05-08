@@ -7,8 +7,42 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div id="game-container">
-        <div id="header">
+
+    <div id="boot-sequence">
+        
+        <div id="splash-1" class="splash-screen active">
+            <h1 class="game-title">
+                <span class="t-red">B</span><span class="t-blue">L</span><span class="t-yellow">O</span><span class="t-green">C</span><span class="t-purple">K</span>
+                <br>PUZZLE
+            </h1>
+            
+            <div class="block-loader">
+                <div class="lb lb-1 color-red"></div>
+                <div class="lb lb-2 color-blue"></div>
+                <div class="lb lb-4 color-green"></div>
+                <div class="lb lb-3 color-yellow"></div>
+            </div>
+            <div class="loading-text">LOADING...</div>
+        </div>
+
+        <div id="splash-2" class="splash-screen">
+            <div class="studio-logo">
+                <h1>NovaForge</h1>
+                <h2>STUDIOS</h2>
+            </div>
+        </div>
+
+        <div id="splash-3" class="splash-screen">
+            <h1 class="game-title">
+                <span class="t-red">B</span><span class="t-blue">L</span><span class="t-yellow">O</span><span class="t-green">C</span><span class="t-purple">K</span>
+                <br>PUZZLE
+            </h1>
+            <button id="play-btn" onclick="startActualGame()">PLAY</button>
+        </div>
+
+    </div>
+
+    <div id="game-container" style="opacity: 0;"> <div id="header">
             <div id="high-score">👑 <span id="best-score-text">0</span></div>
             <div id="settings-icon">⚙️</div>
         </div>
@@ -22,9 +56,14 @@
             <div class="tray-slot" id="slot-1"></div>
             <div class="tray-slot" id="slot-2"></div>
         </div>
+
+        <div id="game-over" style="display: none;">
+            <h2>Out of Moves!</h2>
+            <button id="revive-btn" onclick="reviveGame()">💖 FREE REVIVE</button>
+            <button id="restart-btn" onclick="resetGame()">TRY AGAIN</button>
+        </div>
     </div>
 
     <script src="game.js"></script>
 </body>
 </html>
-
