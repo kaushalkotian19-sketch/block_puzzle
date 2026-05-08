@@ -6,7 +6,7 @@ const COLS = 8;
 
 let grid = Array(ROWS).fill().map(() => Array(COLS).fill(0));
 let score = 0;
-let hasRevived = false; // 🚨 Tracks if they used their 1 revive!
+let hasRevived = false;
 
 let bestScore = localStorage.getItem('blockPuzzleBest') || 0;
 document.getElementById('best-score-text').innerText = bestScore;
@@ -78,7 +78,6 @@ function spawnTrayBlocks() {
         shapeElement.addEventListener('touchstart', handleTouchStart, { passive: false });
         slot.appendChild(shapeElement);
     }
-    
     checkGameOver();
 }
 
@@ -309,18 +308,12 @@ function checkGameOver() {
     }
 }
 
-// ==========================================
-// 🚨 NEW: THE REVIVE & RESET LOGIC 🚨
-// ==========================================
-
 function reviveGame() {
-    if (hasRevived) return; // Only 1 revive per round allowed!
+    if (hasRevived) return; 
     hasRevived = true;
 
-    // Hide the Game Over screen
     document.getElementById('game-over').style.display = 'none';
 
-    // Build the payload: Blow up a massive 4x4 area in the dead center
     let cellsToShatter = new Set();
     for (let r = 2; r <= 5; r++) {
         for (let c = 2; c <= 5; c++) {
@@ -331,7 +324,6 @@ function reviveGame() {
     }
 
     if (cellsToShatter.size > 0) {
-        // Play an extra heavy vibration and screen shake
         boardElement.classList.add('shake');
         if (navigator.vibrate) navigator.vibrate([100, 50, 100, 50, 100]); 
 
@@ -347,7 +339,6 @@ function reviveGame() {
                 document.getElementById(`cell-${id}`).className = 'cell'; 
             });
 
-            // Hide the Revive button so they can't use it again this round
             document.getElementById('revive-btn').style.display = 'none';
             checkGameOver(); 
         }, 300);
@@ -356,18 +347,15 @@ function reviveGame() {
     }
 }
 
-// This allows us to restart without having to refresh the entire browser window!
 function resetGame() {
     grid = Array(ROWS).fill().map(() => Array(COLS).fill(0));
     score = 0;
     document.getElementById('score-display').innerText = score;
     hasRevived = false;
     
-    // Reset the UI
     document.getElementById('revive-btn').style.display = 'block'; 
     document.getElementById('game-over').style.display = 'none';
     
-    // Visually wipe the board clean
     for (let r = 0; r < ROWS; r++) {
         for (let c = 0; c < COLS; c++) {
             document.getElementById(`cell-${r}-${c}`).className = 'cell'; 
@@ -377,6 +365,43 @@ function resetGame() {
     spawnTrayBlocks();
 }
 
-// Boot up the game
-createBoard();
-spawnTrayBlocks();
+// ==========================================
+// 🎬 BOOT SEQUENCE TIMELINE 🎬
+// ==========================================
+
+const splash1 = document.getElementById('splash-1');
+const splash2 = document.getElementById('splash-2');
+const splash3 = document.getElementById('splash-3');
+const bootSequence = document.getElementById('boot-sequence');
+
+// Hide the game board initially
+document.getElementById('game-container').style.opacity = '0';
+
+function runBootSequence() {
+    // Wait 5 seconds, then crossfade to NovaForge Studios
+    setTimeout(() => {
+        splash1.classList.remove('active');
+        splash2.classList.add('active');
+    }, 5000);
+
+    // Wait 2.5 more seconds, fade to Main Menu
+    setTimeout(() => {
+        splash2.classList.remove('active');
+        splash3.classList.add('active');
+    }, 7500);
+}
+
+function startActualGame() {
+    bootSequence.style.opacity = '0';
+    document.getElementById('game-container').style.opacity = '1';
+    document.getElementById('game-container').style.transition = 'opacity 1s ease';
+
+    setTimeout(() => {
+        bootSequence.style.display = 'none';
+        createBoard();
+        spawnTrayBlocks();
+    }, 500);
+}
+
+// Start the movie!
+runBootSequence();
