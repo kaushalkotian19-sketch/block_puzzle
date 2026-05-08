@@ -1,5 +1,74 @@
 // game.js - The Complete Block Puzzle Engine
 
+// ==========================================
+// 🎵 AUDIO & SETTINGS MANAGER 🎵
+// ==========================================
+const sounds = {
+    pickup: new Audio('assets/pickup.mp3'),
+    drop: new Audio('assets/drop.mp3'),
+    error: new Audio('assets/error.mp3'),
+    shatter: new Audio('assets/shutter.mp3'), 
+    combo: new Audio('assets/combo.mp3'),
+    gameover: new Audio('assets/gameover.mp3'),
+    revive: new Audio('assets/revive-blast.mp3'),
+    click: new Audio('assets/button-click.mp3')
+};
+
+let masterVolume = localStorage.getItem('blockPuzzleVolume') !== null ? parseFloat(localStorage.getItem('blockPuzzleVolume')) : 1.0;
+let isMuted = localStorage.getItem('blockPuzzleMuted') === 'true';
+
+function playSound(name) {
+    if (isMuted || masterVolume === 0) return; 
+    
+    const soundClone = sounds[name].cloneNode();
+    soundClone.volume = masterVolume;
+    soundClone.play().catch(e => console.log("Waiting for user interaction."));
+}
+
+function openSettings() {
+    playSound('click');
+    document.getElementById('settings-modal').style.display = 'flex';
+    document.getElementById('volume-slider').value = masterVolume;
+    updateMuteUI();
+}
+
+function closeSettings() {
+    playSound('click');
+    document.getElementById('settings-modal').style.display = 'none';
+}
+
+function updateVolume(val) {
+    masterVolume = parseFloat(val);
+    localStorage.setItem('blockPuzzleVolume', masterVolume);
+    
+    if (isMuted && masterVolume > 0) {
+        isMuted = false;
+        localStorage.setItem('blockPuzzleMuted', isMuted);
+        updateMuteUI();
+    }
+}
+
+function toggleMute() {
+    playSound('click');
+    isMuted = !isMuted;
+    localStorage.setItem('blockPuzzleMuted', isMuted); 
+    updateMuteUI();
+}
+
+function updateMuteUI() {
+    const btn = document.getElementById('sound-toggle-btn');
+    if (isMuted) {
+        btn.innerText = '🔇 Sound Off';
+        btn.classList.add('muted');
+    } else {
+        btn.innerText = '🔊 Sound On';
+        btn.classList.remove('muted');
+    }
+}
+
+// ==========================================
+// 🧩 CORE GAME VARIABLES 🧩
+// ==========================================
 const boardElement = document.getElementById('board');
 const ROWS = 8;
 const COLS = 8;
@@ -7,6 +76,7 @@ const COLS = 8;
 let grid = Array(ROWS).fill().map(() => Array(COLS).fill(0));
 let score = 0;
 let hasRevived = false;
+let tutorialSeen = localStorage.getItem('blockPuzzleTutorial') === 'true';
 
 let bestScore = localStorage.getItem('blockPuzzleBest') || 0;
 document.getElementById('best-score-text').innerText = bestScore;
@@ -81,6 +151,17 @@ function spawnTrayBlocks() {
     checkGameOver();
 }
 
+function hideTutorial(isButton = false) {
+    if (tutorialSeen) return;
+    if (isButton) playSound('click'); 
+    tutorialSeen = true;
+    localStorage.setItem('blockPuzzleTutorial', 'true');
+    document.getElementById('tutorial-overlay').style.display = 'none';
+}
+
+// ==========================================
+// 👆 DRAG AND DROP SYSTEM 👆
+// ==========================================
 let activeShape = null;
 let originalSlot = null;
 
@@ -92,6 +173,8 @@ function handleTouchStart(e) {
     const touch = e.touches[0];
     activeShape.classList.add('dragging');
     moveShapeToFinger(touch.clientX, touch.clientY);
+
+    playSound('pickup');
 
     document.addEventListener('touchmove', handleTouchMove, { passive: false });
     document.addEventListener('touchend', handleTouchEnd);
@@ -166,7 +249,10 @@ function handleTouchEnd(e) {
         placeShape(shapeMatrix, colorClass, targetRow, targetCol);
         activeShape.remove(); 
         
+        playSound('drop');
         if (navigator.vibrate) navigator.vibrate(20);
+
+        hideTutorial();
 
         addScore(10); 
 
@@ -178,6 +264,7 @@ function handleTouchEnd(e) {
 
     } else {
         originalSlot.appendChild(activeShape); 
+        playSound('error');
     }
 
     document.removeEventListener('touchmove', handleTouchMove);
@@ -185,6 +272,9 @@ function handleTouchEnd(e) {
     activeShape = null;
 }
 
+// ==========================================
+// 💥 THE MATRIX LOGIC 💥
+// ==========================================
 function canPlaceShape(matrix, startRow, startCol) {
     for (let r = 0; r < matrix.length; r++) {
         for (let c = 0; c < matrix[r].length; c++) {
@@ -251,6 +341,11 @@ function checkAndClearLines() {
     const linesCleared = rowsToClear.length + colsToClear.length;
     if (linesCleared === 0) return 0; 
 
+    playSound('shatter');
+    if (linesCleared >= 2) {
+        setTimeout(() => playSound('combo'), 100); 
+    }
+
     let cellsToShatter = new Set();
     rowsToClear.forEach(r => { for (let c = 0; c < COLS; c++) cellsToShatter.add(`${r}-${c}`); });
     colsToClear.forEach(c => { for (let r = 0; r < ROWS; r++) cellsToShatter.add(`${r}-${c}`); });
@@ -304,13 +399,21 @@ function checkGameOver() {
     });
 
     if (!canPlayAnywhere) {
+        playSound('gameover');
         document.getElementById('game-over').style.display = 'flex';
     }
 }
 
+// ==========================================
+// 🚨 THE REVIVE & RESET LOGIC 🚨
+// ==========================================
+
 function reviveGame() {
     if (hasRevived) return; 
     hasRevived = true;
+
+    playSound('click');
+    playSound('revive');
 
     document.getElementById('game-over').style.display = 'none';
 
@@ -348,6 +451,8 @@ function reviveGame() {
 }
 
 function resetGame() {
+    playSound('click');
+
     grid = Array(ROWS).fill().map(() => Array(COLS).fill(0));
     score = 0;
     document.getElementById('score-display').innerText = score;
@@ -374,17 +479,14 @@ const splash2 = document.getElementById('splash-2');
 const splash3 = document.getElementById('splash-3');
 const bootSequence = document.getElementById('boot-sequence');
 
-// Hide the game board initially
 document.getElementById('game-container').style.opacity = '0';
 
 function runBootSequence() {
-    // Wait 5 seconds, then crossfade to NovaForge Studios
     setTimeout(() => {
         splash1.classList.remove('active');
         splash2.classList.add('active');
     }, 5000);
 
-    // Wait 2.5 more seconds, fade to Main Menu
     setTimeout(() => {
         splash2.classList.remove('active');
         splash3.classList.add('active');
@@ -392,6 +494,8 @@ function runBootSequence() {
 }
 
 function startActualGame() {
+    playSound('click');
+
     bootSequence.style.opacity = '0';
     document.getElementById('game-container').style.opacity = '1';
     document.getElementById('game-container').style.transition = 'opacity 1s ease';
@@ -400,8 +504,11 @@ function startActualGame() {
         bootSequence.style.display = 'none';
         createBoard();
         spawnTrayBlocks();
+        
+        if (!tutorialSeen) {
+            document.getElementById('tutorial-overlay').style.display = 'flex';
+        }
     }, 500);
 }
 
-// Start the movie!
 runBootSequence();
