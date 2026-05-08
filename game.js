@@ -6,10 +6,11 @@ const COLS = 8;
 
 let grid = Array(ROWS).fill().map(() => Array(COLS).fill(0));
 let score = 0;
+let hasRevived = false; // 🚨 Tracks if they used their 1 revive!
 
-// ==========================================
-// 1. BOARD INITIALIZATION
-// ==========================================
+let bestScore = localStorage.getItem('blockPuzzleBest') || 0;
+document.getElementById('best-score-text').innerText = bestScore;
+
 function createBoard() {
     boardElement.innerHTML = ''; 
     for (let r = 0; r < ROWS; r++) {
@@ -22,16 +23,28 @@ function createBoard() {
     }
 }
 
-// ==========================================
-// 2. THE SHAPE DICTIONARY
-// ==========================================
 const SHAPES = [
     { name: 'dot', color: 'color-purple', matrix: [[1]] },
     { name: 'square-2x2', color: 'color-yellow', matrix: [[1, 1], [1, 1]] },
     { name: 'square-3x3', color: 'color-blue', matrix: [[1, 1, 1], [1, 1, 1], [1, 1, 1]] },
     { name: 'line-h-3', color: 'color-red', matrix: [[1, 1, 1]] },
     { name: 'line-v-3', color: 'color-green', matrix: [[1], [1], [1]] },
-    { name: 'l-shape-right', color: 'color-purple', matrix: [[1, 0], [1, 0], [1, 1]] }
+    { name: 'line-h-4', color: 'color-red', matrix: [[1, 1, 1, 1]] },
+    { name: 'line-v-4', color: 'color-green', matrix: [[1], [1], [1], [1]] },
+    { name: 'l-shape-small', color: 'color-purple', matrix: [[1, 0], [1, 1]] },
+    { name: 'l-shape-big', color: 'color-blue', matrix: [
+        [1, 0, 0],
+        [1, 0, 0],
+        [1, 1, 1]
+    ]},
+    { name: 't-shape', color: 'color-yellow', matrix: [
+        [1, 1, 1],
+        [0, 1, 0]
+    ]},
+    { name: 'z-shape', color: 'color-red', matrix: [
+        [1, 1, 0],
+        [0, 1, 1]
+    ]}
 ];
 
 function spawnTrayBlocks() {
@@ -47,7 +60,6 @@ function spawnTrayBlocks() {
         const cols = randomShape.matrix[0].length;
         shapeElement.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
 
-        // Save data to the HTML element so the drop logic can read it later
         shapeElement.dataset.matrix = JSON.stringify(randomShape.matrix);
         shapeElement.dataset.color = randomShape.color;
 
@@ -66,11 +78,10 @@ function spawnTrayBlocks() {
         shapeElement.addEventListener('touchstart', handleTouchStart, { passive: false });
         slot.appendChild(shapeElement);
     }
+    
+    checkGameOver();
 }
 
-// ==========================================
-// 3. DRAG AND DROP LOGIC
-// ==========================================
 let activeShape = null;
 let originalSlot = null;
 
@@ -92,6 +103,24 @@ function handleTouchMove(e) {
     if (!activeShape) return;
     const touch = e.touches[0];
     moveShapeToFinger(touch.clientX, touch.clientY);
+
+    clearGhost();
+
+    const shapeRect = activeShape.getBoundingClientRect();
+    const boardRect = boardElement.getBoundingClientRect();
+    const cellSize = boardRect.width / 8;
+
+    const relativeX = shapeRect.left - boardRect.left;
+    const relativeY = shapeRect.top - boardRect.top;
+    
+    const targetCol = Math.round(relativeX / cellSize);
+    const targetRow = Math.round(relativeY / cellSize);
+
+    const shapeMatrix = JSON.parse(activeShape.dataset.matrix);
+
+    if (canPlaceShape(shapeMatrix, targetRow, targetCol)) {
+        drawGhost(shapeMatrix, targetRow, targetCol);
+    }
 }
 
 function moveShapeToFinger(x, y) {
@@ -101,13 +130,22 @@ function moveShapeToFinger(x, y) {
     activeShape.style.top = `${y - offsetY}px`;
 }
 
-// ==========================================
-// 4. THE MATRIX SNAP & SHATTER SYSTEM
-// ==========================================
+function addScore(points) {
+    score += points;
+    document.getElementById('score-display').innerText = score;
+    
+    if (score > bestScore) {
+        bestScore = score;
+        localStorage.setItem('blockPuzzleBest', bestScore);
+        document.getElementById('best-score-text').innerText = bestScore;
+    }
+}
+
 function handleTouchEnd(e) {
     if (!activeShape) return;
 
-    // 1. Get exact pixel coordinates of the floating shape before we reset it
+    clearGhost();
+
     const shapeRect = activeShape.getBoundingClientRect();
     const boardRect = boardElement.getBoundingClientRect();
     const cellSize = boardRect.width / 8;
@@ -116,7 +154,6 @@ function handleTouchEnd(e) {
     activeShape.style.left = '';
     activeShape.style.top = '';
 
-    // 2. Convert raw pixels to 8x8 Grid Rows and Columns
     const relativeX = shapeRect.left - boardRect.left;
     const relativeY = shapeRect.top - boardRect.top;
     
@@ -126,18 +163,22 @@ function handleTouchEnd(e) {
     const shapeMatrix = JSON.parse(activeShape.dataset.matrix);
     const colorClass = activeShape.dataset.color;
 
-    // 3. Check if it fits, lock it in, and check for shattered lines!
     if (canPlaceShape(shapeMatrix, targetRow, targetCol)) {
         placeShape(shapeMatrix, colorClass, targetRow, targetCol);
-        activeShape.remove(); // Delete it from the tray
+        activeShape.remove(); 
         
-        score += 10; // 10 points just for placing a piece
-        document.getElementById('score-display').innerText = score;
+        if (navigator.vibrate) navigator.vibrate(20);
 
-        checkAndClearLines();
-        checkTrayEmpty();
+        addScore(10); 
+
+        const linesCleared = checkAndClearLines();
+        if (linesCleared === 0) {
+            checkTrayEmpty();
+            checkGameOver();
+        }
+
     } else {
-        originalSlot.appendChild(activeShape); // Snap back to tray
+        originalSlot.appendChild(activeShape); 
     }
 
     document.removeEventListener('touchmove', handleTouchMove);
@@ -151,14 +192,12 @@ function canPlaceShape(matrix, startRow, startCol) {
             if (matrix[r][c] === 1) {
                 const tr = startRow + r;
                 const tc = startCol + c;
-                // Out of bounds check
                 if (tr < 0 || tr >= ROWS || tc < 0 || tc >= COLS) return false;
-                // Spot already taken check
                 if (grid[tr][tc] !== 0) return false;
             }
         }
     }
-    return true; // The piece fits perfectly!
+    return true; 
 }
 
 function placeShape(matrix, colorClass, startRow, startCol) {
@@ -167,11 +206,7 @@ function placeShape(matrix, colorClass, startRow, startCol) {
             if (matrix[r][c] === 1) {
                 const tr = startRow + r;
                 const tc = startCol + c;
-                
-                // Tell the computer's invisible matrix the spot is taken
                 grid[tr][tc] = 1; 
-                
-                // Visually paint the 3D block onto the screen
                 const cell = document.getElementById(`cell-${tr}-${tc}`);
                 cell.className = `cell block-cell ${colorClass}`; 
             }
@@ -179,59 +214,167 @@ function placeShape(matrix, colorClass, startRow, startCol) {
     }
 }
 
+function drawGhost(matrix, startRow, startCol) {
+    for (let r = 0; r < matrix.length; r++) {
+        for (let c = 0; c < matrix[r].length; c++) {
+            if (matrix[r][c] === 1) {
+                const cell = document.getElementById(`cell-${startRow + r}-${startCol + c}`);
+                if (cell && cell.className === 'cell') {
+                    cell.classList.add('ghost-cell');
+                }
+            }
+        }
+    }
+}
+
+function clearGhost() {
+    document.querySelectorAll('.ghost-cell').forEach(cell => {
+        cell.classList.remove('ghost-cell');
+    });
+}
+
 function checkAndClearLines() {
     let rowsToClear = [];
     let colsToClear = [];
 
-    // Scan Rows
     for (let r = 0; r < ROWS; r++) {
         let isFull = true;
-        for (let c = 0; c < COLS; c++) {
-            if (grid[r][c] === 0) isFull = false;
-        }
+        for (let c = 0; c < COLS; c++) { if (grid[r][c] === 0) isFull = false; }
         if (isFull) rowsToClear.push(r);
     }
 
-    // Scan Columns
     for (let c = 0; c < COLS; c++) {
         let isFull = true;
-        for (let r = 0; r < ROWS; r++) {
-            if (grid[r][c] === 0) isFull = false;
-        }
+        for (let r = 0; r < ROWS; r++) { if (grid[r][c] === 0) isFull = false; }
         if (isFull) colsToClear.push(c);
     }
 
-    // Erase the full rows visually and logically
-    rowsToClear.forEach(r => {
-        for (let c = 0; c < COLS; c++) {
-            grid[r][c] = 0;
-            document.getElementById(`cell-${r}-${c}`).className = 'cell'; 
-        }
-    });
-
-    // Erase the full columns visually and logically
-    colsToClear.forEach(c => {
-        for (let r = 0; r < ROWS; r++) {
-            grid[r][c] = 0;
-            document.getElementById(`cell-${r}-${c}`).className = 'cell'; 
-        }
-    });
-
-    // Big Score Bonus!
     const linesCleared = rowsToClear.length + colsToClear.length;
-    if (linesCleared > 0) {
-        score += linesCleared * 100;
-        document.getElementById('score-display').innerText = score;
-    }
+    if (linesCleared === 0) return 0; 
+
+    let cellsToShatter = new Set();
+    rowsToClear.forEach(r => { for (let c = 0; c < COLS; c++) cellsToShatter.add(`${r}-${c}`); });
+    colsToClear.forEach(c => { for (let r = 0; r < ROWS; r++) cellsToShatter.add(`${r}-${c}`); });
+
+    boardElement.classList.add('shake');
+    if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+
+    cellsToShatter.forEach(id => {
+        document.getElementById(`cell-${id}`).classList.add('shatter-anim');
+    });
+
+    addScore(linesCleared * 100);
+
+    setTimeout(() => {
+        boardElement.classList.remove('shake');
+        cellsToShatter.forEach(id => {
+            const [r, c] = id.split('-').map(Number);
+            grid[r][c] = 0; 
+            document.getElementById(`cell-${id}`).className = 'cell'; 
+        });
+
+        checkTrayEmpty();
+        checkGameOver();
+        
+    }, 300);
+
+    return linesCleared;
 }
 
 function checkTrayEmpty() {
     const slots = [document.getElementById('slot-0'), document.getElementById('slot-1'), document.getElementById('slot-2')];
-    // If every slot has 0 children, the tray is empty!
     const isEmpty = slots.every(slot => slot.children.length === 0);
-    if (isEmpty) {
-        spawnTrayBlocks();
+    if (isEmpty) spawnTrayBlocks();
+}
+
+function checkGameOver() {
+    const slots = [document.getElementById('slot-0'), document.getElementById('slot-1'), document.getElementById('slot-2')];
+    let canPlayAnywhere = false;
+
+    slots.forEach(slot => {
+        if (slot.children.length > 0) {
+            const shapeElement = slot.children[0];
+            const matrix = JSON.parse(shapeElement.dataset.matrix);
+            
+            for (let r = 0; r < ROWS; r++) {
+                for (let c = 0; c < COLS; c++) {
+                    if (canPlaceShape(matrix, r, c)) canPlayAnywhere = true; 
+                }
+            }
+        }
+    });
+
+    if (!canPlayAnywhere) {
+        document.getElementById('game-over').style.display = 'flex';
     }
+}
+
+// ==========================================
+// 🚨 NEW: THE REVIVE & RESET LOGIC 🚨
+// ==========================================
+
+function reviveGame() {
+    if (hasRevived) return; // Only 1 revive per round allowed!
+    hasRevived = true;
+
+    // Hide the Game Over screen
+    document.getElementById('game-over').style.display = 'none';
+
+    // Build the payload: Blow up a massive 4x4 area in the dead center
+    let cellsToShatter = new Set();
+    for (let r = 2; r <= 5; r++) {
+        for (let c = 2; c <= 5; c++) {
+            if (grid[r][c] === 1) {
+                cellsToShatter.add(`${r}-${c}`);
+            }
+        }
+    }
+
+    if (cellsToShatter.size > 0) {
+        // Play an extra heavy vibration and screen shake
+        boardElement.classList.add('shake');
+        if (navigator.vibrate) navigator.vibrate([100, 50, 100, 50, 100]); 
+
+        cellsToShatter.forEach(id => {
+            document.getElementById(`cell-${id}`).classList.add('shatter-anim');
+        });
+
+        setTimeout(() => {
+            boardElement.classList.remove('shake');
+            cellsToShatter.forEach(id => {
+                const [r, c] = id.split('-').map(Number);
+                grid[r][c] = 0; 
+                document.getElementById(`cell-${id}`).className = 'cell'; 
+            });
+
+            // Hide the Revive button so they can't use it again this round
+            document.getElementById('revive-btn').style.display = 'none';
+            checkGameOver(); 
+        }, 300);
+    } else {
+        document.getElementById('revive-btn').style.display = 'none';
+    }
+}
+
+// This allows us to restart without having to refresh the entire browser window!
+function resetGame() {
+    grid = Array(ROWS).fill().map(() => Array(COLS).fill(0));
+    score = 0;
+    document.getElementById('score-display').innerText = score;
+    hasRevived = false;
+    
+    // Reset the UI
+    document.getElementById('revive-btn').style.display = 'block'; 
+    document.getElementById('game-over').style.display = 'none';
+    
+    // Visually wipe the board clean
+    for (let r = 0; r < ROWS; r++) {
+        for (let c = 0; c < COLS; c++) {
+            document.getElementById(`cell-${r}-${c}`).className = 'cell'; 
+        }
+    }
+    
+    spawnTrayBlocks();
 }
 
 // Boot up the game
